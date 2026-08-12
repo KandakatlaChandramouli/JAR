@@ -1,8 +1,8 @@
 [package]
 name = "jar"
-version = "0.9.0"
+version = "1.0.0"
 edition = "2021"
-description = "A progressively extensible Linux process-isolation runtime prototype"
+description = "A Linux process-isolation container runtime prototype written in pure Rust"
 authors = ["JAR Project"]
 
 [dependencies]
@@ -12,3 +12,9 @@ libc = "0.2"
 caps = "0.5"
 tar = "0.4"
 flate2 = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

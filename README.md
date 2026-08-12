@@ -1,22 +1,17 @@
-# JAR — Just Another Runtime
+# JAR - Linux Process-Isolation Container Runtime
 
-**JAR** is a research-grade Linux process-isolation runtime built from first principles.
+**JAR (v1.0.0)** is a lightweight, extensible Linux process isolation container runtime written in pure Rust. It leverages Linux kernel primitives—namespaces, cgroups v2, Seccomp BPF filters, POSIX capabilities, and OverlayFS—to construct fully isolated process sandboxes without daemon overhead.
 
-## Project Overview
-The immediate objective is to build a minimal, correct, auditable sandbox that can execute an untrusted Linux process inside a controlled environment. 
+## Key Features
+- **Multi-Namespace Isolation**: Enforces separate User (`CLONE_NEWUSER`), Mount (`CLONE_NEWNS`), and PID (`CLONE_NEWPID`) namespaces.
+- **Rootless Mapping**: Maps host unprivileged UIDs to container `root` (UID 0) inside user namespaces.
+- **Copy-on-Write Filesystems**: Mounts ephemeral **OverlayFS** scratchpads (`upper`, `work`, `merged`) over base rootfs targets or extracted OCI image archives.
+- **OCI/Docker Image Support**: Unpacks `.tar` and `.tar.gz`/`.tgz` exported container image tarballs directly.
+- **Cgroups v2 Resource Constraints**: Restricts maximum memory usage (`memory.max`) and process tree counts (`pids.max`).
+- **Syscall Filtering**: Applies strict default `EPERM` Seccomp BPF execution whitelists.
+- **Privilege Boundary Dropping**: Strips Effective, Permitted, Inheritable, and Ambient POSIX capabilities prior to process execution.
 
-JAR explicitly avoids wrapping existing container runtimes, focusing instead on direct implementation of Linux isolation primitives.
+## Installation & Building
 
-## Current Capabilities (v0.1)
-- Deterministic process execution
-- Direct stdio forwarding
-- Exit-status propagation
-- Core lifecycle abstractions
-
-*Note: v0.1 provides NO security isolation. See `docs/security_limitations.md`.*
-
-## Build and Run
 ```bash
 cargo build --release
-./target/release/jar run /bin/echo "Hello, JAR"
-quit

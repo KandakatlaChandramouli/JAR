@@ -15,21 +15,30 @@ pub struct RunOptions {
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Run(RunOptions),
+    Help,
+    Version,
 }
 
 pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, JarError> {
     let mut args_iter = args.skip(1);
 
-    let cmd = args_iter.next().ok_or_else(|| {
-        JarError::InvalidArgs(
-            "Missing command. Usage: jar run [OPTIONS] <program> [args...]".to_string(),
-        )
-    })?;
+    let cmd = match args_iter.next() {
+        Some(arg) => arg,
+        None => return Ok(Command::Help),
+    };
 
-    if cmd != "run" {
-        return Err(JarError::InvalidArgs(format!("Unknown command: {}", cmd)));
+    match cmd.as_str() {
+        "-h" | "--help" | "help" => Ok(Command::Help),
+        "-V" | "--version" | "version" => Ok(Command::Version),
+        "run" => parse_run_args(args_iter),
+        unknown => Err(JarError::InvalidArgs(format!(
+            "Unknown command: '{}'. Run 'jar --help' for usage.",
+            unknown
+        ))),
     }
+}
 
+fn parse_run_args(mut args_iter: impl Iterator<Item = String>) -> Result<Command, JarError> {
     let mut rootfs = None;
     let mut image = None;
     let mut memory_max_bytes = None;
@@ -40,6 +49,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, JarErro
 
     while let Some(arg) = args_iter.next() {
         match arg.as_str() {
+            "-h" | "--help" => return Ok(Command::Help),
             "--rootfs" => {
                 rootfs = Some(args_iter.next().ok_or_else(|| {
                     JarError::InvalidArgs("Missing path for --rootfs option".to_string())
@@ -114,4 +124,28 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, JarErro
         enable_seccomp,
         drop_capabilities,
     }))
+}
+
+pub fn print_help() {
+    println!(
+        "JAR v1.0.0 - A Linux Process-Isolation Container Runtime in Pure Rust\n\n\
+Usage:\n  \
+jar run [OPTIONS] <executable> [args...]\n  \
+jar [COMMAND]\n\n\
+Commands:\n  \
+run           Execute a command inside an isolated container sandbox\n  \
+help, -h      Print help information\n  \
+version, -V   Print version information\n\n\
+Run Options:\n  \
+--image <PATH>    Path to OCI/Docker tarball archive (.tar, .tar.gz, .tgz)\n  \
+--rootfs <PATH>   Path to custom rootfs target directory\n  \
+--memory <BYTES>  Maximum physical memory limit in bytes (e.g., 536870912)\n  \
+--pids <MAX>      Maximum allowed process count (fork-bomb defense)\n  \
+--no-seccomp      Disable default Seccomp BPF syscall restriction profile\n  \
+--no-caps-drop    Retain standard POSIX capabilities (do not strip caps)"
+    );
+}
+
+pub fn print_version() {
+    println!("jar version 1.0.0");
 }
