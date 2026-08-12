@@ -5,11 +5,9 @@ pub struct SeccompFilter;
 
 impl SeccompFilter {
     pub fn apply_default_profile() -> Result<(), JarError> {
-        // Default action: Deny unpermitted syscalls with EPERM (Operation Not Permitted)
         let mut ctx = ScmpFilterContext::new_filter(ScmpAction::Errno(libc::EPERM))
             .map_err(|e| JarError::Execution(format!("Failed to init seccomp context: {}", e)))?;
 
-        // Essential Syscall Whitelist for core execution and Rust runtime
         let allowed_syscalls = [
             "read",
             "write",
@@ -53,6 +51,14 @@ impl SeccompFilter {
             "set_robust_list",
             "getrandom",
             "clock_gettime",
+            "prlimit64",
+            "getrlimit",
+            "madvise",
+            "statfs",
+            "uname",
+            "sysinfo",
+            "capget",
+            "capset",
         ];
 
         for name in &allowed_syscalls {
@@ -64,7 +70,6 @@ impl SeccompFilter {
             }
         }
 
-        // Explicitly load BPF filter into the calling child process context
         ctx.load().map_err(|e| {
             JarError::Execution(format!("Failed to load seccomp BPF filter: {}", e))
         })?;

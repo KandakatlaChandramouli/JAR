@@ -89,14 +89,14 @@ impl ProcessExecutor {
             );
         }
 
-        // Drop Linux capabilities prior to seccomp and execvp
-        if spec.drop_capabilities {
-            CapabilityManager::drop_all_capabilities()?;
-        }
-
-        // Apply Seccomp BPF filter right before execvp call
+        // 1. Apply Seccomp BPF filter FIRST
         if spec.enable_seccomp {
             SeccompFilter::apply_default_profile()?;
+        }
+
+        // 2. Drop Linux capabilities SECOND (right before execvp)
+        if spec.drop_capabilities {
+            CapabilityManager::drop_all_capabilities()?;
         }
 
         let c_executable = CString::new(spec.executable.clone())
