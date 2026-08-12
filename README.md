@@ -15,3 +15,16 @@
 
 ```bash
 cargo build --release
+The release binary will be created at target/release/jar.
+
+Usage Examples
+Bash
+# Basic Execution
+jar run /bin/echo "Hello from JAR sandbox"
+
+# Cgroup Limits
+jar run --memory 536870912 --pids 100 /bin/bash
+
+# Exported OCI/Docker Image
+docker export $(docker create ubuntu:latest) -o ubuntu.tar
+jar run --image ubuntu.tar /bin/bash

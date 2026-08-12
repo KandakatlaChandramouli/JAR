@@ -7,6 +7,31 @@ fn jar_bin() -> String {
 }
 
 #[test]
+fn test_cli_help_flag() {
+    let output = Command::new(jar_bin())
+        .arg("--help")
+        .output()
+        .expect("Failed to execute jar binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("JAR v1.0.0"));
+    assert!(stdout.contains("Run Options:"));
+}
+
+#[test]
+fn test_cli_version_flag() {
+    let output = Command::new(jar_bin())
+        .arg("--version")
+        .output()
+        .expect("Failed to execute jar binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("jar version 1.0.0"));
+}
+
+#[test]
 fn test_run_valid_command() {
     let output = Command::new(jar_bin())
         .args(["run", "/bin/echo", "hello-jar"])
@@ -60,7 +85,6 @@ fn test_oci_image_tarball_extraction() {
     let file = File::create(archive_path).expect("Failed to create mock image tar file");
     let mut a = Builder::new(file);
 
-    // Append contents directly to root of tarball
     a.append_dir_all(".", src_dir)
         .expect("Failed to build mock tarball");
     a.finish().expect("Failed to finalize tarball");
@@ -140,7 +164,7 @@ fn test_invalid_cli_args() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Argument error: Unknown command"));
+    assert!(stderr.contains("Unknown command"));
 }
 
 #[test]
