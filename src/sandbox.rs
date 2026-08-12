@@ -1,4 +1,5 @@
 use crate::cgroup::{CgroupManager, ResourceLimits};
+use crate::cli::RunOptions;
 use crate::error::JarError;
 use crate::process::{ProcessExecutor, ProcessSpec};
 
@@ -6,9 +7,22 @@ pub struct SandboxConfig {
     pub executable: String,
     pub args: Vec<String>,
     pub rootfs: Option<String>,
-    pub limits: Option<ResourceLimits>,
+    pub limits: ResourceLimits,
     pub enable_seccomp: bool,
     pub drop_capabilities: bool,
+}
+
+impl From<RunOptions> for SandboxConfig {
+    fn from(opts: RunOptions) -> Self {
+        Self {
+            executable: opts.executable,
+            args: opts.args,
+            rootfs: opts.rootfs,
+            limits: opts.limits,
+            enable_seccomp: opts.enable_seccomp,
+            drop_capabilities: opts.drop_capabilities,
+        }
+    }
 }
 
 pub struct Sandbox {
@@ -35,10 +49,13 @@ impl Sandbox {
 
         println!("[jar] executable: {}", self.config.executable);
 
-        let _cgroup = if let Some(ref limits) = self.config.limits {
+        // Apply Cgroup limits if any bounds are explicitly specified
+        let _cgroup = if self.config.limits.memory_max_bytes.is_some()
+            || self.config.limits.pids_max.is_some()
+        {
             println!("[jar] applying cgroups v2 resource limits");
             let cg = CgroupManager::new("sandbox_exec")?;
-            cg.apply_limits(limits)?;
+            cg.apply_limits(&self.config.limits)?;
             Some(cg)
         } else {
             None

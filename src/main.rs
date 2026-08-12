@@ -27,15 +27,8 @@ fn run() -> Result<i32, error::JarError> {
     let command = parse_args(env::args())?;
 
     match command {
-        cli::Command::Run { executable, args } => {
-            let config = SandboxConfig {
-                executable,
-                args,
-                rootfs: None,
-                limits: None,
-                enable_seccomp: true,
-                drop_capabilities: true,
-            };
+        cli::Command::Run(opts) => {
+            let config = SandboxConfig::from(opts);
             let sandbox = Sandbox::new(config);
             sandbox.run()
         }

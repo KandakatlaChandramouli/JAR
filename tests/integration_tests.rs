@@ -21,6 +21,29 @@ fn test_run_valid_command() {
 }
 
 #[test]
+fn test_run_with_memory_and_pids_flags() {
+    let output = Command::new(jar_bin())
+        .args([
+            "run",
+            "--memory",
+            "536870912",
+            "--pids",
+            "100",
+            "/bin/echo",
+            "cgroup-limits-test",
+        ])
+        .output()
+        .expect("Failed to execute jar binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(stdout.contains("[jar] applying cgroups v2 resource limits"));
+    assert!(stdout.contains("cgroup-limits-test"));
+    assert!(stdout.contains("[jar] process exited: 0"));
+}
+
+#[test]
 fn test_user_namespace_id_mapping() {
     let output = Command::new(jar_bin())
         .args(["run", "/usr/bin/id", "-u"])

@@ -4,7 +4,7 @@ use std::fs::{create_dir_all, remove_dir, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ResourceLimits {
     pub memory_max_bytes: Option<u64>,
     pub cpu_max_quota_us: Option<u64>,
