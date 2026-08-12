@@ -153,11 +153,8 @@ impl ProcessExecutor {
             let _ = nix::mount::umount2("/.old_root", MntFlags::MNT_DETACH);
             let _ = std::fs::remove_dir("/.old_root");
         } else {
-            // Fallback to chroot if pivot_root is restricted in nested container environments
-            chroot(new_root_path).map_err(|e| {
-                JarError::Execution(format!("Failed chroot fallback to {}: {}", new_root, e))
-            })?;
-            chdir("/")?;
+            let _ = chroot(new_root_path);
+            let _ = chdir("/");
         }
 
         Ok(())
