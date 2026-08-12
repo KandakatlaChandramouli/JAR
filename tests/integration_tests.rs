@@ -15,14 +15,13 @@ fn test_run_valid_command() {
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(stdout.contains("[jar] preparing execution"));
-    assert!(stdout.contains("[jar] process started in isolated user/mount namespaces"));
+    assert!(stdout.contains("[jar] process started in isolated user/mount/PID namespaces"));
     assert!(stdout.contains("hello-jar"));
     assert!(stdout.contains("[jar] process exited: 0"));
 }
 
 #[test]
 fn test_user_namespace_id_mapping() {
-    // Verify that inside the container user namespace, uid maps to root (0)
     let output = Command::new(jar_bin())
         .args(["run", "/usr/bin/id", "-u"])
         .output()
@@ -30,7 +29,6 @@ fn test_user_namespace_id_mapping() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // Root user ID inside user namespace is 0
     assert!(stdout.contains("0"));
 }
 

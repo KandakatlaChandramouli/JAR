@@ -9,7 +9,6 @@ pub enum Command {
 }
 
 pub fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Command, JarError> {
-    // Skip binary name
     args.next();
 
     let cmd = args.next().ok_or_else(|| {

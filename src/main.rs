@@ -25,7 +25,11 @@ fn run() -> Result<i32, error::JarError> {
 
     match command {
         cli::Command::Run { executable, args } => {
-            let config = SandboxConfig { executable, args };
+            let config = SandboxConfig {
+                executable,
+                args,
+                rootfs: None,
+            };
             let sandbox = Sandbox::new(config);
             sandbox.run()
         }

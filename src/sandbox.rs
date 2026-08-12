@@ -4,6 +4,7 @@ use crate::process::{ProcessExecutor, ProcessSpec};
 pub struct SandboxConfig {
     pub executable: String,
     pub args: Vec<String>,
+    pub rootfs: Option<String>,
 }
 
 pub struct Sandbox {
@@ -33,9 +34,10 @@ impl Sandbox {
         let spec = ProcessSpec {
             executable: self.config.executable.clone(),
             args: self.config.args.clone(),
+            rootfs: self.config.rootfs.clone(),
         };
 
-        println!("[jar] process started in isolated user/mount namespaces");
+        println!("[jar] process started in isolated user/mount/PID namespaces");
 
         let exit_code = ProcessExecutor::execute(&spec)?;
 
