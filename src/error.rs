@@ -6,6 +6,7 @@ pub enum JarError {
     Validation(String),
     Execution(String),
     Io(std::io::Error),
+    Syscall(nix::Error),
 }
 
 impl fmt::Display for JarError {
@@ -15,6 +16,7 @@ impl fmt::Display for JarError {
             JarError::Validation(msg) => write!(f, "Validation error: {}", msg),
             JarError::Execution(msg) => write!(f, "Execution error: {}", msg),
             JarError::Io(err) => write!(f, "IO error: {}", err),
+            JarError::Syscall(err) => write!(f, "Syscall error: {}", err),
         }
     }
 }
@@ -22,5 +24,11 @@ impl fmt::Display for JarError {
 impl From<std::io::Error> for JarError {
     fn from(err: std::io::Error) -> Self {
         JarError::Io(err)
+    }
+}
+
+impl From<nix::Error> for JarError {
+    fn from(err: nix::Error) -> Self {
+        JarError::Syscall(err)
     }
 }

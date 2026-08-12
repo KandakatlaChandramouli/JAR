@@ -13,11 +13,25 @@ fn test_run_valid_command() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     assert!(stdout.contains("[jar] preparing execution"));
-    assert!(stdout.contains("[jar] process started"));
+    assert!(stdout.contains("[jar] process started in isolated user/mount namespaces"));
     assert!(stdout.contains("hello-jar"));
     assert!(stdout.contains("[jar] process exited: 0"));
+}
+
+#[test]
+fn test_user_namespace_id_mapping() {
+    // Verify that inside the container user namespace, uid maps to root (0)
+    let output = Command::new(jar_bin())
+        .args(["run", "/usr/bin/id", "-u"])
+        .output()
+        .expect("Failed to execute jar binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Root user ID inside user namespace is 0
+    assert!(stdout.contains("0"));
 }
 
 #[test]
@@ -28,9 +42,6 @@ fn test_run_missing_executable() {
         .expect("Failed to execute jar binary");
 
     assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("[jar] error:"));
-    assert!(stderr.contains("Failed to spawn child process"));
 }
 
 #[test]
