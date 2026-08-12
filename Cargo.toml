@@ -1,0 +1,9 @@
+[package]
+name = "jar"
+version = "0.1.0"
+edition = "2021"
+description = "A progressively extensible Linux process-isolation runtime prototype"
+authors = ["JAR Project"]
+
+# Intentionally minimal dependencies for v0.1.
+[dependencies]
