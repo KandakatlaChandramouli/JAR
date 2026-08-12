@@ -1,3 +1,4 @@
+use crate::cgroup::{CgroupManager, ResourceLimits};
 use crate::error::JarError;
 use crate::process::{ProcessExecutor, ProcessSpec};
 
@@ -5,6 +6,7 @@ pub struct SandboxConfig {
     pub executable: String,
     pub args: Vec<String>,
     pub rootfs: Option<String>,
+    pub limits: Option<ResourceLimits>,
 }
 
 pub struct Sandbox {
@@ -30,6 +32,16 @@ impl Sandbox {
         self.validate()?;
 
         println!("[jar] executable: {}", self.config.executable);
+
+        // Initialize Cgroups manager if limits or default isolation requested
+        let _cgroup = if let Some(ref limits) = self.config.limits {
+            println!("[jar] applying cgroups v2 resource limits");
+            let cg = CgroupManager::new("sandbox_exec")?;
+            cg.apply_limits(limits)?;
+            Some(cg)
+        } else {
+            None
+        };
 
         let spec = ProcessSpec {
             executable: self.config.executable.clone(),
