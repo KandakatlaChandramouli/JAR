@@ -1,7 +1,7 @@
 use crate::error::JarError;
 use nix::unistd::Pid;
 use std::fs::{create_dir_all, remove_dir, File};
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -27,7 +27,16 @@ impl CgroupManager {
             ));
         }
 
-        create_dir_all(&cgroup_path)?;
+        if let Err(e) = create_dir_all(&cgroup_path) {
+            if e.kind() == ErrorKind::PermissionDenied {
+                eprintln!("[jar warning] cgroup creation skipped due to unprivileged permissions");
+                return Ok(CgroupManager { cgroup_path });
+            }
+            return Err(JarError::Execution(format!(
+                "Failed to create cgroup dir: {}",
+                e
+            )));
+        }
 
         Ok(CgroupManager { cgroup_path })
     }
@@ -55,11 +64,23 @@ impl CgroupManager {
 
     fn write_cgroup_file(&self, filename: &str, content: &str) -> Result<(), JarError> {
         let file_path = self.cgroup_path.join(filename);
-        let mut file = File::create(&file_path).map_err(|e| {
-            JarError::Execution(format!("Failed to open cgroup file {:?}: {}", file_path, e))
-        })?;
-        file.write_all(content.as_bytes())?;
-        Ok(())
+        match File::create(&file_path) {
+            Ok(mut file) => {
+                let _ = file.write_all(content.as_bytes());
+                Ok(())
+            }
+            Err(e) if e.kind() == ErrorKind::PermissionDenied => {
+                eprintln!(
+                    "[jar warning] cgroup setting '{}' skipped: permission denied in unprivileged container",
+                    filename
+                );
+                Ok(())
+            }
+            Err(e) => Err(JarError::Execution(format!(
+                "Failed to open cgroup file {:?}: {}",
+                file_path, e
+            ))),
+        }
     }
 }
 
