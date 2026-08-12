@@ -1,3 +1,4 @@
+mod capabilities;
 mod cgroup;
 mod cli;
 mod error;
@@ -33,6 +34,7 @@ fn run() -> Result<i32, error::JarError> {
                 rootfs: None,
                 limits: None,
                 enable_seccomp: true,
+                drop_capabilities: true,
             };
             let sandbox = Sandbox::new(config);
             sandbox.run()

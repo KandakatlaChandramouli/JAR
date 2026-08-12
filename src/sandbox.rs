@@ -8,6 +8,7 @@ pub struct SandboxConfig {
     pub rootfs: Option<String>,
     pub limits: Option<ResourceLimits>,
     pub enable_seccomp: bool,
+    pub drop_capabilities: bool,
 }
 
 pub struct Sandbox {
@@ -48,6 +49,7 @@ impl Sandbox {
             args: self.config.args.clone(),
             rootfs: self.config.rootfs.clone(),
             enable_seccomp: self.config.enable_seccomp,
+            drop_capabilities: self.config.drop_capabilities,
         };
 
         println!("[jar] process started in isolated user/mount/PID namespaces");

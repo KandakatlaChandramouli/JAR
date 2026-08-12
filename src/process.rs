@@ -1,3 +1,4 @@
+use crate::capabilities::CapabilityManager;
 use crate::error::JarError;
 use crate::seccomp::SeccompFilter;
 use nix::mount::{mount, MntFlags, MsFlags};
@@ -16,6 +17,7 @@ pub struct ProcessSpec {
     pub args: Vec<String>,
     pub rootfs: Option<String>,
     pub enable_seccomp: bool,
+    pub drop_capabilities: bool,
 }
 
 pub struct ProcessExecutor;
@@ -85,6 +87,11 @@ impl ProcessExecutor {
                 MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
                 None::<&str>,
             );
+        }
+
+        // Drop Linux capabilities prior to seccomp and execvp
+        if spec.drop_capabilities {
+            CapabilityManager::drop_all_capabilities()?;
         }
 
         // Apply Seccomp BPF filter right before execvp call
