@@ -2,6 +2,7 @@ mod capabilities;
 mod cgroup;
 mod cli;
 mod error;
+mod image;
 mod overlay;
 mod process;
 mod sandbox;

@@ -1,6 +1,6 @@
 [package]
 name = "jar"
-version = "0.6.0"
+version = "0.9.0"
 edition = "2021"
 description = "A progressively extensible Linux process-isolation runtime prototype"
 authors = ["JAR Project"]
@@ -10,3 +10,5 @@ nix = { version = "0.29", features = ["process", "sched", "mount", "user", "fs"]
 libseccomp = "0.3"
 libc = "0.2"
 caps = "0.5"
+tar = "0.4"
+flate2 = "1.0"

@@ -6,6 +6,7 @@ pub struct RunOptions {
     pub executable: String,
     pub args: Vec<String>,
     pub rootfs: Option<String>,
+    pub image: Option<String>,
     pub limits: ResourceLimits,
     pub enable_seccomp: bool,
     pub drop_capabilities: bool,
@@ -30,6 +31,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, JarErro
     }
 
     let mut rootfs = None;
+    let mut image = None;
     let mut memory_max_bytes = None;
     let mut pids_max = None;
     let mut enable_seccomp = true;
@@ -41,6 +43,11 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, JarErro
             "--rootfs" => {
                 rootfs = Some(args_iter.next().ok_or_else(|| {
                     JarError::InvalidArgs("Missing path for --rootfs option".to_string())
+                })?);
+            }
+            "--image" => {
+                image = Some(args_iter.next().ok_or_else(|| {
+                    JarError::InvalidArgs("Missing path for --image option".to_string())
                 })?);
             }
             "--memory" => {
@@ -102,6 +109,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Command, JarErro
         executable,
         args,
         rootfs,
+        image,
         limits,
         enable_seccomp,
         drop_capabilities,

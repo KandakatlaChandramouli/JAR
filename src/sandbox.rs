@@ -1,6 +1,7 @@
 use crate::cgroup::{CgroupManager, ResourceLimits};
 use crate::cli::RunOptions;
 use crate::error::JarError;
+use crate::image::ImageUnpacker;
 use crate::overlay::OverlayManager;
 use crate::process::{ProcessExecutor, ProcessSpec};
 
@@ -8,6 +9,7 @@ pub struct SandboxConfig {
     pub executable: String,
     pub args: Vec<String>,
     pub rootfs: Option<String>,
+    pub image: Option<String>,
     pub limits: ResourceLimits,
     pub enable_seccomp: bool,
     pub drop_capabilities: bool,
@@ -19,6 +21,7 @@ impl From<RunOptions> for SandboxConfig {
             executable: opts.executable,
             args: opts.args,
             rootfs: opts.rootfs,
+            image: opts.image,
             limits: opts.limits,
             enable_seccomp: opts.enable_seccomp,
             drop_capabilities: opts.drop_capabilities,
@@ -61,7 +64,15 @@ impl Sandbox {
             None
         };
 
-        let overlay = if let Some(ref lower_path) = self.config.rootfs {
+        // Determine effective lower rootfs: unpack image tarball OR use explicit --rootfs path
+        let effective_rootfs_path = if let Some(ref image_path) = self.config.image {
+            let unpacked_path = ImageUnpacker::unpack_tarball(image_path, "sandbox_exec")?;
+            Some(unpacked_path.to_string_lossy().to_string())
+        } else {
+            self.config.rootfs.clone()
+        };
+
+        let overlay = if let Some(ref lower_path) = effective_rootfs_path {
             println!("[jar] setting up OverlayFS copy-on-write filesystem layer");
             Some(OverlayManager::new("sandbox_exec", lower_path)?)
         } else {
@@ -71,7 +82,7 @@ impl Sandbox {
         let spec = ProcessSpec {
             executable: self.config.executable.clone(),
             args: self.config.args.clone(),
-            rootfs: self.config.rootfs.clone(),
+            rootfs: effective_rootfs_path,
             overlay: overlay.clone(),
             enable_seccomp: self.config.enable_seccomp,
             drop_capabilities: self.config.drop_capabilities,
