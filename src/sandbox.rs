@@ -50,7 +50,6 @@ impl Sandbox {
 
         println!("[jar] executable: {}", self.config.executable);
 
-        // Apply Cgroup limits if any bounds are explicitly specified
         let _cgroup = if self.config.limits.memory_max_bytes.is_some()
             || self.config.limits.pids_max.is_some()
         {
@@ -62,34 +61,30 @@ impl Sandbox {
             None
         };
 
-        // Initialize ephemeral OverlayFS if lower rootfs path is provided
         let overlay = if let Some(ref lower_path) = self.config.rootfs {
             println!("[jar] setting up OverlayFS copy-on-write filesystem layer");
-            let mgr = OverlayManager::new("sandbox_exec", lower_path)?;
-            mgr.mount_overlay()?;
-            Some(mgr)
+            Some(OverlayManager::new("sandbox_exec", lower_path)?)
         } else {
             None
         };
 
-        let target_rootfs = overlay
-            .as_ref()
-            .map(|o| o.merged_dir.to_string_lossy().to_string());
-
         let spec = ProcessSpec {
             executable: self.config.executable.clone(),
             args: self.config.args.clone(),
-            rootfs: target_rootfs,
+            rootfs: self.config.rootfs.clone(),
+            overlay: overlay.clone(),
             enable_seccomp: self.config.enable_seccomp,
             drop_capabilities: self.config.drop_capabilities,
         };
 
         println!("[jar] process started in isolated user/mount/PID namespaces");
 
-        let exit_code = ProcessExecutor::execute(&spec)?;
+        let exit_code = ProcessExecutor::execute(&spec);
 
-        println!("[jar] process exited: {}", exit_code);
+        if let Some(ref mgr) = overlay {
+            mgr.cleanup();
+        }
 
-        Ok(exit_code)
+        exit_code
     }
 }

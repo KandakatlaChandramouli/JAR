@@ -1,5 +1,6 @@
 use crate::capabilities::CapabilityManager;
 use crate::error::JarError;
+use crate::overlay::OverlayManager;
 use crate::seccomp::SeccompFilter;
 use nix::mount::{mount, MntFlags, MsFlags};
 use nix::sched::{clone, CloneFlags};
@@ -16,6 +17,7 @@ pub struct ProcessSpec {
     pub executable: String,
     pub args: Vec<String>,
     pub rootfs: Option<String>,
+    pub overlay: Option<OverlayManager>,
     pub enable_seccomp: bool,
     pub drop_capabilities: bool,
 }
@@ -77,7 +79,14 @@ impl ProcessExecutor {
             None::<&str>,
         )?;
 
-        if let Some(ref rootfs) = spec.rootfs {
+        let effective_rootfs = if let Some(ref overlay) = spec.overlay {
+            overlay.mount_overlay()?;
+            Some(overlay.merged_dir.to_string_lossy().to_string())
+        } else {
+            spec.rootfs.clone()
+        };
+
+        if let Some(ref rootfs) = effective_rootfs {
             Self::setup_pivot_root(rootfs)?;
         } else {
             let _ = mount(
@@ -89,12 +98,10 @@ impl ProcessExecutor {
             );
         }
 
-        // 1. Apply Seccomp BPF filter FIRST
         if spec.enable_seccomp {
             SeccompFilter::apply_default_profile()?;
         }
 
-        // 2. Drop Linux capabilities SECOND (right before execvp)
         if spec.drop_capabilities {
             CapabilityManager::drop_all_capabilities()?;
         }

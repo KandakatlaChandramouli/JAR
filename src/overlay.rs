@@ -3,12 +3,13 @@ use nix::mount::{mount, umount2, MntFlags, MsFlags};
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
 
+#[derive(Debug, Clone)]
 pub struct OverlayManager {
     pub lower_dir: PathBuf,
     pub upper_dir: PathBuf,
     pub work_dir: PathBuf,
     pub merged_dir: PathBuf,
-    base_tmp_path: PathBuf,
+    pub base_tmp_path: PathBuf,
 }
 
 impl OverlayManager {
@@ -43,21 +44,22 @@ impl OverlayManager {
             self.work_dir.display()
         );
 
-        mount(
+        match mount(
             Some("overlay"),
             &self.merged_dir,
             Some("overlay"),
             MsFlags::empty(),
             Some(options.as_str()),
-        )
-        .map_err(|e| JarError::Execution(format!("Failed to mount OverlayFS: {}", e)))?;
-
-        Ok(())
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                eprintln!("[jar warning] OverlayFS mount failed ({}); falling back to direct rootfs mount", e);
+                Ok(())
+            }
+        }
     }
-}
 
-impl Drop for OverlayManager {
-    fn drop(&mut self) {
+    pub fn cleanup(&self) {
         let _ = umount2(&self.merged_dir, MntFlags::MNT_DETACH);
         let _ = remove_dir_all(&self.base_tmp_path);
     }

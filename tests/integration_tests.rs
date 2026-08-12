@@ -1,5 +1,4 @@
-use std::fs::{create_dir_all, remove_dir_all, File};
-use std::io::Write;
+use std::fs::{create_dir_all, remove_dir_all};
 use std::process::Command;
 
 fn jar_bin() -> String {
@@ -51,7 +50,6 @@ fn test_overlayfs_copy_on_write_rootfs() {
     let _ = remove_dir_all(test_rootfs);
     create_dir_all(format!("{}/bin", test_rootfs)).expect("Failed to create test rootfs bin");
 
-    // Copy host /bin/echo into dummy rootfs
     std::fs::copy("/bin/echo", format!("{}/bin/echo", test_rootfs))
         .expect("Failed to copy echo binary to test rootfs");
 
