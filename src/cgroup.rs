@@ -33,17 +33,14 @@ impl CgroupManager {
     }
 
     pub fn apply_limits(&self, limits: &ResourceLimits) -> Result<(), JarError> {
-        // 1. Apply memory maximum limit
         if let Some(mem_max) = limits.memory_max_bytes {
             self.write_cgroup_file("memory.max", &mem_max.to_string())?;
         }
 
-        // 2. Apply CPU bandwidth limits (quota period)
         if let (Some(quota), Some(period)) = (limits.cpu_max_quota_us, limits.cpu_max_period_us) {
             self.write_cgroup_file("cpu.max", &format!("{} {}", quota, period))?;
         }
 
-        // 3. Apply maximum PID/process limit (fork-bomb mitigation)
         if let Some(pids_max) = limits.pids_max {
             self.write_cgroup_file("pids.max", &pids_max.to_string())?;
         }
@@ -51,6 +48,7 @@ impl CgroupManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn attach_process(&self, pid: Pid) -> Result<(), JarError> {
         self.write_cgroup_file("cgroup.procs", &pid.as_raw().to_string())
     }
@@ -67,7 +65,6 @@ impl CgroupManager {
 
 impl Drop for CgroupManager {
     fn drop(&mut self) {
-        // Best-effort deterministic cleanup of the cgroup node on drop
         let _ = remove_dir(&self.cgroup_path);
     }
 }

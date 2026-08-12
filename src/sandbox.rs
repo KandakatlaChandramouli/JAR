@@ -7,6 +7,7 @@ pub struct SandboxConfig {
     pub args: Vec<String>,
     pub rootfs: Option<String>,
     pub limits: Option<ResourceLimits>,
+    pub enable_seccomp: bool,
 }
 
 pub struct Sandbox {
@@ -33,7 +34,6 @@ impl Sandbox {
 
         println!("[jar] executable: {}", self.config.executable);
 
-        // Initialize Cgroups manager if limits or default isolation requested
         let _cgroup = if let Some(ref limits) = self.config.limits {
             println!("[jar] applying cgroups v2 resource limits");
             let cg = CgroupManager::new("sandbox_exec")?;
@@ -47,6 +47,7 @@ impl Sandbox {
             executable: self.config.executable.clone(),
             args: self.config.args.clone(),
             rootfs: self.config.rootfs.clone(),
+            enable_seccomp: self.config.enable_seccomp,
         };
 
         println!("[jar] process started in isolated user/mount/PID namespaces");

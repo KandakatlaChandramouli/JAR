@@ -3,6 +3,7 @@ mod cli;
 mod error;
 mod process;
 mod sandbox;
+mod seccomp;
 
 use cli::parse_args;
 use sandbox::{Sandbox, SandboxConfig};
@@ -31,6 +32,7 @@ fn run() -> Result<i32, error::JarError> {
                 args,
                 rootfs: None,
                 limits: None,
+                enable_seccomp: true,
             };
             let sandbox = Sandbox::new(config);
             sandbox.run()

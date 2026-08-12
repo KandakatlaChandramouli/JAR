@@ -1,4 +1,5 @@
 use crate::error::JarError;
+use crate::seccomp::SeccompFilter;
 use nix::mount::{mount, MntFlags, MsFlags};
 use nix::sched::{clone, CloneFlags};
 use nix::sys::signal::Signal;
@@ -14,6 +15,7 @@ pub struct ProcessSpec {
     pub executable: String,
     pub args: Vec<String>,
     pub rootfs: Option<String>,
+    pub enable_seccomp: bool,
 }
 
 pub struct ProcessExecutor;
@@ -23,7 +25,6 @@ impl ProcessExecutor {
         const STACK_SIZE: usize = 1024 * 1024;
         let mut stack = vec![0u8; STACK_SIZE];
 
-        // Combine User, Mount, and PID namespace flags
         let flags = CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID;
 
         let child_fn = Box::new(|| -> isize {
@@ -66,7 +67,6 @@ impl ProcessExecutor {
     }
 
     fn child_entrypoint(spec: &ProcessSpec) -> Result<(), JarError> {
-        // 1. Make mount propagation private so changes don't leak to host
         mount(
             None::<&str>,
             "/",
@@ -75,11 +75,9 @@ impl ProcessExecutor {
             None::<&str>,
         )?;
 
-        // 2. Perform pivot_root if custom rootfs provided, or setup fresh /proc
         if let Some(ref rootfs) = spec.rootfs {
             Self::setup_pivot_root(rootfs)?;
         } else {
-            // Remount /proc in place for isolated PID space when running against host root
             let _ = mount(
                 Some("proc"),
                 "/proc",
@@ -89,7 +87,11 @@ impl ProcessExecutor {
             );
         }
 
-        // 3. Execute target executable
+        // Apply Seccomp BPF filter right before execvp call
+        if spec.enable_seccomp {
+            SeccompFilter::apply_default_profile()?;
+        }
+
         let c_executable = CString::new(spec.executable.clone())
             .map_err(|e| JarError::Execution(format!("Invalid path: {}", e)))?;
 
@@ -111,7 +113,6 @@ impl ProcessExecutor {
         let new_root = Path::new(new_root);
         let old_root = new_root.join(".old_root");
 
-        // Bind mount new_root to itself to satisfy pivot_root requirement
         mount(
             Some(new_root),
             new_root,
@@ -125,7 +126,6 @@ impl ProcessExecutor {
         pivot_root(new_root, &old_root)?;
         chdir("/")?;
 
-        // Mount new /proc inside isolated filesystem
         create_dir_all("/proc")?;
         mount(
             Some("proc"),
@@ -135,7 +135,6 @@ impl ProcessExecutor {
             None::<&str>,
         )?;
 
-        // Unmount old root and clean up
         nix::mount::umount2("/.old_root", MntFlags::MNT_DETACH)?;
         std::fs::remove_dir("/.old_root")?;
 
