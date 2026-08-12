@@ -18,3 +18,11 @@ opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
+
+[[bin]]
+name = "jar-probe"
+path = "src/bin/jar-probe.rs"
+
+[[bin]]
+name = "jar"
+path = "src/main.rs"

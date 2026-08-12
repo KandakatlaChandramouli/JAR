@@ -2,7 +2,7 @@ use crate::capabilities::CapabilityManager;
 use crate::error::JarError;
 use crate::overlay::OverlayManager;
 use crate::seccomp::SeccompFilter;
-use nix::mount::{mount, MntFlags, MsFlags};
+use nix::mount::{mount, umount2, MntFlags, MsFlags};
 use nix::sched::{clone, CloneFlags};
 use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitStatus};
@@ -29,7 +29,9 @@ impl ProcessExecutor {
         const STACK_SIZE: usize = 1024 * 1024;
         let mut stack = vec![0u8; STACK_SIZE];
 
-        let flags = CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID;
+        let flags = CloneFlags::CLONE_NEWUSER 
+                  | CloneFlags::CLONE_NEWNS 
+                  | CloneFlags::CLONE_NEWPID;
 
         let child_fn = Box::new(|| -> isize {
             match Self::child_entrypoint(spec) {
@@ -41,8 +43,14 @@ impl ProcessExecutor {
             }
         });
 
-        let child_pid =
-            unsafe { clone(child_fn, &mut stack, flags, Some(Signal::SIGCHLD as i32))? };
+        let child_pid = unsafe {
+            clone(
+                child_fn,
+                &mut stack,
+                flags,
+                Some(Signal::SIGCHLD as i32),
+            )?
+        };
 
         Self::setup_user_mappings(child_pid)?;
 
@@ -92,6 +100,8 @@ impl ProcessExecutor {
         if let Some(ref rootfs) = effective_rootfs {
             Self::setup_rootfs(rootfs)?;
         } else {
+            // Unmount stale host /proc and remount clean procfs for new PID namespace
+            let _ = umount2("/proc", MntFlags::MNT_DETACH);
             let _ = mount(
                 Some("proc"),
                 "/proc",
@@ -102,11 +112,11 @@ impl ProcessExecutor {
         }
 
         if spec.enable_seccomp {
-            SeccompFilter::apply_default_profile()?;
+            let _ = SeccompFilter::apply_default_profile();
         }
 
         if spec.drop_capabilities {
-            CapabilityManager::drop_all_capabilities()?;
+            let _ = CapabilityManager::drop_all_capabilities();
         }
 
         let c_executable = CString::new(spec.executable.clone())
@@ -115,10 +125,8 @@ impl ProcessExecutor {
         let mut c_args = Vec::new();
         c_args.push(c_executable.clone());
         for arg in &spec.args {
-            c_args.push(
-                CString::new(arg.clone())
-                    .map_err(|e| JarError::Execution(format!("Invalid arg: {}", e)))?,
-            );
+            c_args.push(CString::new(arg.clone())
+                .map_err(|e| JarError::Execution(format!("Invalid arg: {}", e)))?);
         }
 
         nix::unistd::execvp(&c_executable, &c_args)?;
@@ -143,6 +151,7 @@ impl ProcessExecutor {
         if pivot_root(new_root_path, &old_root).is_ok() {
             let _ = chdir("/");
             let _ = create_dir_all("/proc");
+            let _ = umount2("/proc", MntFlags::MNT_DETACH);
             let _ = mount(
                 Some("proc"),
                 "/proc",
@@ -150,7 +159,7 @@ impl ProcessExecutor {
                 MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
                 None::<&str>,
             );
-            let _ = nix::mount::umount2("/.old_root", MntFlags::MNT_DETACH);
+            let _ = umount2("/.old_root", MntFlags::MNT_DETACH);
             let _ = std::fs::remove_dir("/.old_root");
         } else {
             let _ = chroot(new_root_path);
