@@ -1,0 +1,64 @@
+use crate::error::JarError;
+use nix::mount::{mount, umount2, MntFlags, MsFlags};
+use std::fs::{create_dir_all, remove_dir_all};
+use std::path::{Path, PathBuf};
+
+pub struct OverlayManager {
+    pub lower_dir: PathBuf,
+    pub upper_dir: PathBuf,
+    pub work_dir: PathBuf,
+    pub merged_dir: PathBuf,
+    base_tmp_path: PathBuf,
+}
+
+impl OverlayManager {
+    pub fn new(sandbox_id: &str, lower_path: &str) -> Result<Self, JarError> {
+        let lower_dir = Path::new(lower_path).canonicalize().map_err(|e| {
+            JarError::Validation(format!("Invalid lowerdir path {}: {}", lower_path, e))
+        })?;
+
+        let base_tmp_path = Path::new("/tmp").join("jar_overlay").join(sandbox_id);
+        let upper_dir = base_tmp_path.join("upper");
+        let work_dir = base_tmp_path.join("work");
+        let merged_dir = base_tmp_path.join("merged");
+
+        create_dir_all(&upper_dir)?;
+        create_dir_all(&work_dir)?;
+        create_dir_all(&merged_dir)?;
+
+        Ok(OverlayManager {
+            lower_dir,
+            upper_dir,
+            work_dir,
+            merged_dir,
+            base_tmp_path,
+        })
+    }
+
+    pub fn mount_overlay(&self) -> Result<(), JarError> {
+        let options = format!(
+            "lowerdir={},upperdir={},workdir={}",
+            self.lower_dir.display(),
+            self.upper_dir.display(),
+            self.work_dir.display()
+        );
+
+        mount(
+            Some("overlay"),
+            &self.merged_dir,
+            Some("overlay"),
+            MsFlags::empty(),
+            Some(options.as_str()),
+        )
+        .map_err(|e| JarError::Execution(format!("Failed to mount OverlayFS: {}", e)))?;
+
+        Ok(())
+    }
+}
+
+impl Drop for OverlayManager {
+    fn drop(&mut self) {
+        let _ = umount2(&self.merged_dir, MntFlags::MNT_DETACH);
+        let _ = remove_dir_all(&self.base_tmp_path);
+    }
+}

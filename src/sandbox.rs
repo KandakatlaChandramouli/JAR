@@ -1,6 +1,7 @@
 use crate::cgroup::{CgroupManager, ResourceLimits};
 use crate::cli::RunOptions;
 use crate::error::JarError;
+use crate::overlay::OverlayManager;
 use crate::process::{ProcessExecutor, ProcessSpec};
 
 pub struct SandboxConfig {
@@ -61,10 +62,24 @@ impl Sandbox {
             None
         };
 
+        // Initialize ephemeral OverlayFS if lower rootfs path is provided
+        let overlay = if let Some(ref lower_path) = self.config.rootfs {
+            println!("[jar] setting up OverlayFS copy-on-write filesystem layer");
+            let mgr = OverlayManager::new("sandbox_exec", lower_path)?;
+            mgr.mount_overlay()?;
+            Some(mgr)
+        } else {
+            None
+        };
+
+        let target_rootfs = overlay
+            .as_ref()
+            .map(|o| o.merged_dir.to_string_lossy().to_string());
+
         let spec = ProcessSpec {
             executable: self.config.executable.clone(),
             args: self.config.args.clone(),
-            rootfs: self.config.rootfs.clone(),
+            rootfs: target_rootfs,
             enable_seccomp: self.config.enable_seccomp,
             drop_capabilities: self.config.drop_capabilities,
         };

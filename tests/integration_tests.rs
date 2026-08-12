@@ -1,3 +1,5 @@
+use std::fs::{create_dir_all, remove_dir_all, File};
+use std::io::Write;
 use std::process::Command;
 
 fn jar_bin() -> String {
@@ -40,6 +42,36 @@ fn test_run_with_memory_and_pids_flags() {
 
     assert!(stdout.contains("[jar] applying cgroups v2 resource limits"));
     assert!(stdout.contains("cgroup-limits-test"));
+    assert!(stdout.contains("[jar] process exited: 0"));
+}
+
+#[test]
+fn test_overlayfs_copy_on_write_rootfs() {
+    let test_rootfs = "/tmp/jar_test_rootfs";
+    let _ = remove_dir_all(test_rootfs);
+    create_dir_all(format!("{}/bin", test_rootfs)).expect("Failed to create test rootfs bin");
+
+    // Copy host /bin/echo into dummy rootfs
+    std::fs::copy("/bin/echo", format!("{}/bin/echo", test_rootfs))
+        .expect("Failed to copy echo binary to test rootfs");
+
+    let output = Command::new(jar_bin())
+        .args([
+            "run",
+            "--rootfs",
+            test_rootfs,
+            "/bin/echo",
+            "overlay-cow-test",
+        ])
+        .output()
+        .expect("Failed to execute jar binary");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let _ = remove_dir_all(test_rootfs);
+
+    assert!(output.status.success());
+    assert!(stdout.contains("[jar] setting up OverlayFS copy-on-write filesystem layer"));
+    assert!(stdout.contains("overlay-cow-test"));
     assert!(stdout.contains("[jar] process exited: 0"));
 }
 
