@@ -79,12 +79,14 @@ impl Sandbox {
 
         println!("[jar] process started in isolated user/mount/PID namespaces");
 
-        let exit_code = ProcessExecutor::execute(&spec);
+        let exit_code = ProcessExecutor::execute(&spec)?;
 
         if let Some(ref mgr) = overlay {
             mgr.cleanup();
         }
 
-        exit_code
+        println!("[jar] process exited: {}", exit_code);
+
+        Ok(exit_code)
     }
 }

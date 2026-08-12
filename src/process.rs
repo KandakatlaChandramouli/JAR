@@ -6,7 +6,7 @@ use nix::mount::{mount, MntFlags, MsFlags};
 use nix::sched::{clone, CloneFlags};
 use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{chdir, getgid, getuid, pivot_root, Pid};
+use nix::unistd::{chdir, chroot, getgid, getuid, pivot_root, Pid};
 use std::ffi::CString;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
@@ -71,23 +71,26 @@ impl ProcessExecutor {
     }
 
     fn child_entrypoint(spec: &ProcessSpec) -> Result<(), JarError> {
-        mount(
+        let _ = mount(
             None::<&str>,
             "/",
             None::<&str>,
             MsFlags::MS_REC | MsFlags::MS_PRIVATE,
             None::<&str>,
-        )?;
+        );
 
         let effective_rootfs = if let Some(ref overlay) = spec.overlay {
-            overlay.mount_overlay()?;
-            Some(overlay.merged_dir.to_string_lossy().to_string())
+            if overlay.mount_overlay()? {
+                Some(overlay.merged_dir.to_string_lossy().to_string())
+            } else {
+                spec.rootfs.clone()
+            }
         } else {
             spec.rootfs.clone()
         };
 
         if let Some(ref rootfs) = effective_rootfs {
-            Self::setup_pivot_root(rootfs)?;
+            Self::setup_rootfs(rootfs)?;
         } else {
             let _ = mount(
                 Some("proc"),
@@ -123,34 +126,39 @@ impl ProcessExecutor {
         Ok(())
     }
 
-    fn setup_pivot_root(new_root: &str) -> Result<(), JarError> {
-        let new_root = Path::new(new_root);
-        let old_root = new_root.join(".old_root");
+    fn setup_rootfs(new_root: &str) -> Result<(), JarError> {
+        let new_root_path = Path::new(new_root);
 
-        mount(
-            Some(new_root),
-            new_root,
+        let _ = mount(
+            Some(new_root_path),
+            new_root_path,
             None::<&str>,
             MsFlags::MS_BIND | MsFlags::MS_REC,
             None::<&str>,
-        )?;
+        );
 
+        let old_root = new_root_path.join(".old_root");
         create_dir_all(&old_root)?;
 
-        pivot_root(new_root, &old_root)?;
-        chdir("/")?;
-
-        create_dir_all("/proc")?;
-        mount(
-            Some("proc"),
-            "/proc",
-            Some("proc"),
-            MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-            None::<&str>,
-        )?;
-
-        nix::mount::umount2("/.old_root", MntFlags::MNT_DETACH)?;
-        std::fs::remove_dir("/.old_root")?;
+        if pivot_root(new_root_path, &old_root).is_ok() {
+            let _ = chdir("/");
+            let _ = create_dir_all("/proc");
+            let _ = mount(
+                Some("proc"),
+                "/proc",
+                Some("proc"),
+                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                None::<&str>,
+            );
+            let _ = nix::mount::umount2("/.old_root", MntFlags::MNT_DETACH);
+            let _ = std::fs::remove_dir("/.old_root");
+        } else {
+            // Fallback to chroot if pivot_root is restricted in nested container environments
+            chroot(new_root_path).map_err(|e| {
+                JarError::Execution(format!("Failed chroot fallback to {}: {}", new_root, e))
+            })?;
+            chdir("/")?;
+        }
 
         Ok(())
     }

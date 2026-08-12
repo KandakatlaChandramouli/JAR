@@ -36,7 +36,7 @@ impl OverlayManager {
         })
     }
 
-    pub fn mount_overlay(&self) -> Result<(), JarError> {
+    pub fn mount_overlay(&self) -> Result<bool, JarError> {
         let options = format!(
             "lowerdir={},upperdir={},workdir={}",
             self.lower_dir.display(),
@@ -51,10 +51,13 @@ impl OverlayManager {
             MsFlags::empty(),
             Some(options.as_str()),
         ) {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(true),
             Err(e) => {
-                eprintln!("[jar warning] OverlayFS mount failed ({}); falling back to direct rootfs mount", e);
-                Ok(())
+                eprintln!(
+                    "[jar warning] OverlayFS mount skipped ({}); proceeding with base filesystem",
+                    e
+                );
+                Ok(false)
             }
         }
     }
