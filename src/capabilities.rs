@@ -1,5 +1,5 @@
-use caps::{clear, CapSet};
 use crate::error::JarError;
+use caps::{clear, CapSet};
 
 pub struct CapabilityManager;
 

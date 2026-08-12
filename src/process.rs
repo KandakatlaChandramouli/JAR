@@ -29,9 +29,7 @@ impl ProcessExecutor {
         const STACK_SIZE: usize = 1024 * 1024;
         let mut stack = vec![0u8; STACK_SIZE];
 
-        let flags = CloneFlags::CLONE_NEWUSER 
-                  | CloneFlags::CLONE_NEWNS 
-                  | CloneFlags::CLONE_NEWPID;
+        let flags = CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWNS | CloneFlags::CLONE_NEWPID;
 
         let child_fn = Box::new(|| -> isize {
             match Self::child_entrypoint(spec) {
@@ -43,14 +41,8 @@ impl ProcessExecutor {
             }
         });
 
-        let child_pid = unsafe {
-            clone(
-                child_fn,
-                &mut stack,
-                flags,
-                Some(Signal::SIGCHLD as i32),
-            )?
-        };
+        let child_pid =
+            unsafe { clone(child_fn, &mut stack, flags, Some(Signal::SIGCHLD as i32))? };
 
         Self::setup_user_mappings(child_pid)?;
 
@@ -125,8 +117,10 @@ impl ProcessExecutor {
         let mut c_args = Vec::new();
         c_args.push(c_executable.clone());
         for arg in &spec.args {
-            c_args.push(CString::new(arg.clone())
-                .map_err(|e| JarError::Execution(format!("Invalid arg: {}", e)))?);
+            c_args.push(
+                CString::new(arg.clone())
+                    .map_err(|e| JarError::Execution(format!("Invalid arg: {}", e)))?,
+            );
         }
 
         nix::unistd::execvp(&c_executable, &c_args)?;
