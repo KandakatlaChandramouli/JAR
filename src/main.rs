@@ -6,16 +6,16 @@ mod sandbox;
 use cli::parse_args;
 use sandbox::{Sandbox, SandboxConfig};
 use std::env;
-use std::process;
+use std::process::exit;
 
 fn main() {
     match run() {
         Ok(exit_code) => {
-            process::exit(exit_code);
+            exit(exit_code);
         }
         Err(e) => {
             eprintln!("[jar] error: {}", e);
-            process::exit(1);
+            exit(1);
         }
     }
 }
